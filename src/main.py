@@ -40,7 +40,7 @@ print("Model: {}".format(MODEL_NAME))
 
 print("Reading training data")
 train = pd.read_csv('../data/train_clean.csv')
-#test = pd.read_csv('data/test.csv')
+test = pd.read_csv('../data/sample_submission.csv')
 
 X = train['fname']
 y = train['labels'].apply(lambda f: f.split(','))
@@ -57,15 +57,25 @@ for train_index, val_index in mskf.split(X, transformed_y):
        .split_by_idx(val_index)
        .label_from_df(label_delim=','))
 
-
     data = (src.transform(tfms, size=128).databunch(bs=64).normalize(imagenet_stats))
 
     f_score = partial(fbeta, thresh=0.2)
     learn = cnn_learner(data, models.resnet18, pretrained=False, metrics=[f_score, calculate_overall_lwlrap_sklearn])
-    learn.fit_one_cycle(5, slice(1e-6, 1e-1))
+    learn.fit_one_cycle(1, slice(1e-6, 1e-1))
     learn.unfreeze()
-    learn.fit_one_cycle(100, slice(1e-6, 1e-1))
+    learn.fit_one_cycle(1, slice(1e-6, 1e-1))
+    #Save learner
+    learn.export()
+    #Get test predictions
+    test_src = ImageList.from_csv('../'/WORK/'image', Path('../..')/CSV_SUBMISSION, folder='test', suffix='.jpg')
+    learn = load_learner('../'/WORK/'image', test=test_src)
+    preds, _ = learn.get_preds(ds_type=DatasetType.Test)
+
+    test[learn.data.classes] += preds
+
+test[learn.data.classes] /= NFOLDS
 
 
+test.to_csv('submission.csv', index=False)
 
 
