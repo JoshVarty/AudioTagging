@@ -64,10 +64,10 @@ for train_index, val_index in mskf.split(X, transformed_y):
     data = (src.transform(tfms, size=128).databunch(bs=64).normalize(imagenet_stats))
 
     f_score = partial(fbeta, thresh=0.2)
-    learn = cnn_learner(data, models.resnet18, pretrained=False, metrics=[f_score, calculate_overall_lwlrap_sklearn])
+    learn = cnn_learner(data, models.resnet18, pretrained=False, metrics=[f_score])
     learn.fit_one_cycle(5, slice(1e-6, 1e-1))
     learn.unfreeze()
-    learn.fit_one_cycle(20, slice(1e-6, 1e-2))
+    learn.fit_one_cycle(100, slice(1e-6, 1e-2))
 
     val_preds, _ = learn.get_preds(ds_type=DatasetType.Valid)
 
