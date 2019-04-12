@@ -8,6 +8,8 @@ __pycache__/
 
 data/
 work/
+.vscode/
+submission.csv
 
 # Distribution / packaging
 .Python
