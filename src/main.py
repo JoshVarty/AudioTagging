@@ -7,6 +7,12 @@ from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
 from fastai.vision import *
 import sklearn.metrics
 
+# Make required folders if they're not already present
+directories = ['../kfolds', '../model_predictions', '../model_source']
+for directory in directories:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
 # Competition Metric (I think)
 def calculate_overall_lwlrap_sklearn(scores, truth):
     # Calculate the overall lwlrap using sklearn.metrics.lrap.
@@ -53,7 +59,7 @@ test_preds = np.zeros((len(test), 80))
 
 tfms = get_transforms(do_flip=True, max_rotate=0, max_lighting=0.1, max_zoom=0, max_warp=0.)
 
-mskf = MultilabelStratifiedKFold(n_splits=5, random_state=4, shuffle=True)
+mskf = MultilabelStratifiedKFold(n_splits=2, random_state=4, shuffle=True)
 for train_index, val_index in mskf.split(X, transformed_y):
 
     #Our clasifier stuff    
@@ -65,9 +71,9 @@ for train_index, val_index in mskf.split(X, transformed_y):
 
     f_score = partial(fbeta, thresh=0.2)
     learn = cnn_learner(data, models.resnet18, pretrained=False, metrics=[f_score])
-    learn.fit_one_cycle(5, slice(1e-6, 1e-1))
+    learn.fit_one_cycle(1, 1e-2)
     learn.unfreeze()
-    learn.fit_one_cycle(100, slice(1e-6, 1e-2))
+    learn.fit_one_cycle(1, slice(1e-6, 1e-2))
 
     val_preds, _ = learn.get_preds(ds_type=DatasetType.Valid)
 
