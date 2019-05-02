@@ -5,7 +5,7 @@ Working on: https://www.kaggle.com/c/freesound-audio-tagging-2019
 
 1. Run [00_Preprocess.ipynb](https://github.com/JoshVarty/AudioTagging/blob/master/00_Preprocess.ipynb) (Takes ~2.5 hours 😢)
    - Converts audio files into images and saves them
-   - Turns out string labels into binary indicators
+   - Turns string labels into binary indicators
    - Perform label smoothing on the noisy dataset
    - Merge the `train_curated.csv` and `train_noisy.csv` into `train_merged.csv`
 2. Run [01_BasicModel.ipynb](https://github.com/JoshVarty/AudioTagging/blob/master/01_BasicModel.ipynb)
