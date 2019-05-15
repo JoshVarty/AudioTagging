@@ -5,7 +5,10 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MultiLabelBinarizer
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
-from fastai.vision import Path, ImageList, imagenet_stats, cnn_learner, get_transforms, DatasetType, models, load_learner, fbeta
+import PIL
+import fastai
+from fastai.basic_train import _loss_func2activ
+from fastai.vision import Path, ImageList, imagenet_stats, cnn_learner, get_transforms, DatasetType, models, load_learner, fbeta, Image, pil2tensor, Learner, get_preds
 import sklearn.metrics
 from functools import partial
 import torch
@@ -29,6 +32,48 @@ def calculate_overall_lwlrap_sklearn(scores, truth):
     
     return torch.Tensor([overall_lwlrap])
 
+#Overrides fastai's default 'open_image' method to crop based on our crop counter
+def setupNewCrop(counter):
+    
+    def open_fat2019_image(fn, convert_mode, after_open)->Image:
+        
+        x = PIL.Image.open(fn).convert(convert_mode)
+
+        # crop (128x321 for a 5 second long audio clip)
+        time_dim, base_dim = x.size
+        
+        #How many crops can we take?
+        maxCrops = int(np.ceil(time_dim / base_dim))
+        
+        #What's the furthest point at which we can take a crop without running out of pixels
+        lastValidCrop = time_dim - base_dim
+        crop_x = (counter % maxCrops) * base_dim 
+
+        # We don't want to crop any further than the last 128 pixels
+        crop_x = min(crop_x, lastValidCrop)
+
+        x1 = x.crop([crop_x, 0, crop_x+base_dim, base_dim])    
+        
+        # standardize    
+        return Image(pil2tensor(x1, np.float32).div_(255))
+
+    fastai.vision.data.open_image = open_fat2019_image
+
+def custom_tta(learn:Learner, ds_type:DatasetType=DatasetType.Valid):
+    dl = learn.dl(ds_type)
+    ds = dl.dataset
+
+    old_open_image = fastai.vision.data.open_image
+    try:
+        maxNumberOfCrops = 10
+        for i in range(maxNumberOfCrops):
+            #print("starting")
+            setupNewCrop(i)
+            yield get_preds(learn.model, dl, activ=_loss_func2activ(learn.loss_func))[0]
+    finally:
+            fastai.vision.data.open_image = old_open_image
+
+
 DATA = Path('/home/josh/git/AudioTagging/data')
 WORK = Path('/home/josh/git/AudioTagging/work')
 
@@ -45,7 +90,7 @@ IMG_TEST = WORK/'image/test'
 TEST = DATA/'test'
 
 print("Reading training data")
-train = pd.read_csv(DATA/'train_clean.csv')
+train = pd.read_csv(DATA/'train_curated.csv')
 test = pd.read_csv(DATA/'sample_submission.csv')
 train_noisy = pd.read_csv(DATA/'train_noisy.csv')
 
@@ -68,22 +113,24 @@ i = 0
 for _, val_index in mskf.split(X, transformed_y):
 
     #Our clasifier stuff    
-    src = (ImageList.from_csv(WORK/'image', Path('../../')/CSV_TRN_MERGED, folder='trn_merged', suffix='.jpg')
+    src = (ImageList.from_csv(WORK/'image', Path('../../')/DATA/'train_curated.csv', folder='trn_merged', suffix='.jpg')
         .split_by_idx(val_index)
-       .label_from_df(cols=list(df.columns[1:])))
+       #.label_from_df(cols=list(df.columns[1:])))
+       .label_from_df(label_delim=','))
 
-    data = (src.transform(tfms, size=128).databunch(bs=64).normalize(imagenet_stats))
+    data = (src.transform(tfms, size=128).databunch(bs=64).normalize())
 
     f_score = partial(fbeta, thresh=0.2)
-    learn = cnn_learner(data, models.vgg16_bn, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
-    learn.fit_one_cycle(200, 1e-2)
+    learn = cnn_learner(data, models.xresnet101, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
+    learn.fit_one_cycle(150, 1e-2)
 
-    val_preds, _ = learn.get_preds(ds_type=DatasetType.Valid)
+    all_preds = list(custom_tta(learn))
+    val_preds = torch.stack(all_preds).mean(0)
 
     oof_preds[val_index, :] = val_preds
 
     #Save learner
-    learn.export(file=MODEL_NAME + '_' + str(i))
+    learn.export(fname=MODEL_NAME + '_' + str(i))
     i = i + 1
 
 score = calculate_overall_lwlrap_sklearn(oof_preds, transformed_y).numpy()[0]
