@@ -113,16 +113,16 @@ i = 0
 for _, val_index in mskf.split(X, transformed_y):
 
     #Our clasifier stuff    
-    src = (ImageList.from_csv(WORK/'image', Path('../../')/DATA/'train_curated.csv', folder='trn_merged', suffix='.jpg')
+    src = (ImageList.from_csv(WORK/'image', Path('../../')/DATA/'train_smoothed.csv', folder='trn_merged', suffix='.jpg')
         .split_by_idx(val_index)
-       #.label_from_df(cols=list(df.columns[1:])))
-       .label_from_df(label_delim=','))
+       .label_from_df(cols=list(df.columns[1:])))
+       #.label_from_df(label_delim=','))
 
     data = (src.transform(tfms, size=128).databunch(bs=64).normalize())
 
     f_score = partial(fbeta, thresh=0.2)
-    learn = cnn_learner(data, models.xresnet101, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
-    learn.fit_one_cycle(100, 1e-2)
+    learn = cnn_learner(data, models.xresnet152, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
+    learn.fit_one_cycle(125, 1e-2)
 
     all_preds = list(custom_tta(learn))
     val_preds = torch.stack(all_preds).mean(0)
