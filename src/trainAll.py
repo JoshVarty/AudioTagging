@@ -65,7 +65,7 @@ def custom_tta(learn:Learner, ds_type:DatasetType=DatasetType.Valid):
 
     old_open_image = fastai.vision.data.open_image
     try:
-        maxNumberOfCrops = 10
+        maxNumberOfCrops = 20
         for i in range(maxNumberOfCrops):
             #print("starting")
             setupNewCrop(i)
@@ -105,7 +105,7 @@ filenames = filenames.reshape(-1, 1)
 oof_preds = np.zeros((len(train), 80))
 test_preds = np.zeros((len(test), 80))
 
-tfms = get_transforms(do_flip=False, max_rotate=0, max_lighting=0.2, max_zoom=0, max_warp=0.)
+tfms = get_transforms(do_flip=False, max_rotate=0, max_lighting=0.1, max_zoom=0, max_warp=0.)
 mskf = MultilabelStratifiedKFold(n_splits=5, random_state=4, shuffle=True)
 df = pd.read_csv(CSV_TRN_MERGED)
 cols = list(df.columns[1:])
@@ -113,7 +113,7 @@ i = 0
 for _, val_index in mskf.split(X, transformed_y):
 
     #Our clasifier stuff    
-    src = (ImageList.from_csv(WORK/'image', Path('../../')/DATA/'train_smoothed.csv', folder='trn_merged', suffix='.jpg')
+    src = (ImageList.from_csv(WORK/'image', Path('../../')/DATA/'train_smoothed.csv', folder='trn_merged_window', suffix='.jpg')
         .split_by_idx(val_index)
        .label_from_df(cols=list(df.columns[1:])))
        #.label_from_df(label_delim=','))
@@ -122,7 +122,7 @@ for _, val_index in mskf.split(X, transformed_y):
 
     f_score = partial(fbeta, thresh=0.2)
 
-    learn = cnn_learner(data, models.xresnet18, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
+    learn = cnn_learner(data, models.xresnet152, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
     learn.fit_one_cycle(125, 1e-2)
 
     all_preds = list(custom_tta(learn))
