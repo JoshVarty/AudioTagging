@@ -122,7 +122,7 @@ data = (src.transform(tfms, size=128).databunch(bs=64).normalize())
 
 f_score = partial(fbeta, thresh=0.2)
 
-learn = cnn_learner(data, models.xresnet18, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
+learn = cnn_learner(data, models.xresnet50, pretrained=False, metrics=[f_score]).mixup(stack_y=False)
 learn.fit_one_cycle(125, 1e-2)
 
 all_preds = list(custom_tta(learn))
